@@ -82,8 +82,9 @@ def get_veiculo(id):
                      auth=('aboliveira', 'alison00')).json())
     df_veiculos['cad_servico_id'] = id
     df_veiculos['lote'] = \
-    df_filiais[df_filiais['idFilial'] == df_rotulos[df_rotulos['id'] == id]['cad_empresa_id'].values[0]]['nome'].values[
-        0]
+        df_filiais[df_filiais['idFilial'] == df_rotulos[df_rotulos['id'] == id]['cad_empresa_id'].values[0]][
+            'nome'].values[
+            0]
     df_veiculos['servico'] = df_rotulos[df_rotulos['id'] == id]['nome'].values[0]
     return (df_veiculos)
 
@@ -98,7 +99,7 @@ f = lambda x: dict(x['properties'], **{'longitude': x['geometry']['coordinates']
 # In[6]:
 
 
-def get_rastreio(id, data_start, data_end):
+def get_rastreio(id, servico, data_start, data_end):
     """Acessa a API que fornece os rastreios de determinado veículo.
        
     df = get_rastreio(id, data_start, data_end)
@@ -117,13 +118,15 @@ def get_rastreio(id, data_start, data_end):
     req = requests.get("http://backend.rassystem.com.br/app/v1/api/veiculos/" + str(
         int(id)) + "/rastreio?dataInicio=" + data_start + "&dataFim=" + data_end, auth=('aboliveira', 'alison00'))
     if req.status_code == 200:
-        return pd.DataFrame((map(f, req.json()['features'])))
+        df = pd.DataFrame((map(f, req.json()['features'])))
+        df['servico'] = servico
+        return df
 
 
-# In[7]:
+# In[8]:
 
 
-def get_parada(id, data_start, data_end):
+def get_parada(id, servico, data_start, data_end):
     """Acessa a API que fornece os dados de parada de determinado veículo.
        
     df = get_parada(id, data_start, data_end)
@@ -142,10 +145,12 @@ def get_parada(id, data_start, data_end):
     req = requests.get("http://backend.rassystem.com.br/app/v1/api/veiculos/" + str(
         int(id)) + "/paradas?dataInicio=" + data_start + "&dataFim=" + data_end, auth=('aboliveira', 'alison00'))
     if req.status_code == 200:
-        return pd.DataFrame((map(f, req.json()['features'])))
+        df = pd.DataFrame((map(f, req.json()['features'])))
+        df['servico'] = servico
+        return df
 
 
-# In[8]:
+# In[11]:
 
 
 def proc(df):
@@ -165,7 +170,7 @@ def proc(df):
 
     """
     placa = lambda x: df_veiculos[df_veiculos['id'] == x]['nome'].iloc[0]
-    df['servico'] = df['idVeiculo'].apply(lambda x: df_veiculos[df_veiculos['id'] == x]['servico'].iloc[0])
+    # df['servico'] = df['idVeiculo'].apply(lambda x: df_veiculos[df_veiculos['id'] == x]['servico'].iloc[0])
     df['lote'] = df['idVeiculo'].apply(lambda x: df_veiculos[df_veiculos['id'] == x]['lote'].iloc[0])
     df['chamada'] = 'parada' if ('segundos' in df.columns) else 'rastreio'
     df['hora'] = df['data'].apply(lambda x: x.split('T')[1].split('.')[0])
@@ -174,7 +179,7 @@ def proc(df):
     return df
 
 
-# In[9]:
+# In[12]:
 
 
 def get_dataframes(data_start, data_end):
@@ -208,32 +213,35 @@ def get_dataframes(data_start, data_end):
 
     df_veiculos.rename(columns={'placa': 'nome'}, inplace=True)
 
-    ids = df_veiculos['id'].unique()
+    ids = df_veiculos['id']
+
+    servico = df_veiculos['servico']
 
     len_ids = len(ids)
 
-    df_parada = pd.concat(map(get_parada, ids, [data_start] * len_ids, [data_end] * len_ids))
+    df_parada = pd.concat(map(get_parada, ids, servico, [data_start] * len_ids, [data_end] * len_ids))
 
-    df_rastreio = pd.concat(map(get_rastreio, ids, [data_start] * len_ids, [data_end] * len_ids))
+    df_rastreio = pd.concat(map(get_rastreio, ids, servico, [data_start] * len_ids, [data_end] * len_ids))
 
     return df_filiais, df_rotulos, df_veiculos, pd.concat(map(proc, [df_rastreio, df_parada])).rename(
         columns={'idVeiculo': 'placa'})
 
 
-# In[ ]:
+# In[67]:
 
 
 def rotina():
     """Gerencia as extrações e insere os dados no banco de dados  
        
     rotina()
-
+    
 
     """
     c, conn = connection()
     c.execute("select * from tb_log_extracao")
     conn.close()
     df_log_extracao = pd.DataFrame(c)
+    # display(df_log_extracao)
     date_fail = df_log_extracao[df_log_extracao['status'] == 'fail'][['id', 'date_start', 'date_end']].values
 
     for i in date_fail:
@@ -256,7 +264,7 @@ def rotina():
 
         data_start = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%dT07:30:00-03:00")
         data_end = (datetime.now()).strftime("%Y-%m-%dT07:30:00-03:00")
-        if data_end not in df_log_extracao['date_end'].values:
+        if data_end not in df_log_extracao[df_log_extracao['status'] == 'sucess']['date_end'].values:
             print(data_start, data_end)
             df_filiais, df_rotulos, df_veiculos, df = get_dataframes(data_start, data_end)
 
@@ -272,7 +280,7 @@ def rotina():
                 [tuple(row) for row in df.values])
             conn.commit()
             conn.close()
-            print('hey')
+            print('pronto')
             c, conn = connection()
             c.execute("insert into tb_log_extracao (date_start, date_end, status) values (%s, %s, %s)",
                       [data_start, data_end, 'sucess'])
@@ -297,5 +305,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# In[ ]:
