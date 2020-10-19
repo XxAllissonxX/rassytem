@@ -55,7 +55,7 @@ def get_rotulos(x):
 
     """
     df = pd.DataFrame((requests.get('http://backend.rassystem.com.br/app/v1/api/filiais/' + str(x) + '/rotulos',
-                                    auth=('aboliveira', 'alison00'))).json())
+                                    auth=('', ''))).json())
     df['cad_empresa_id'] = df_filiais[df_filiais['idFilial'] == x]['idFilial'].values[0]
     return df
 
@@ -79,7 +79,7 @@ def get_veiculo(id):
     """
     df_veiculos = pd.DataFrame(
         requests.get('http://backend.rassystem.com.br/app/v1/api/rotulos/' + str(id) + '/veiculos',
-                     auth=('aboliveira', 'alison00')).json())
+                     auth=('', '')).json())
     df_veiculos['cad_servico_id'] = id
     df_veiculos['lote'] = \
         df_filiais[df_filiais['idFilial'] == df_rotulos[df_rotulos['id'] == id]['cad_empresa_id'].values[0]][
@@ -116,7 +116,7 @@ def get_rastreio(id, servico, data_start, data_end):
 
     """
     req = requests.get("http://backend.rassystem.com.br/app/v1/api/veiculos/" + str(
-        int(id)) + "/rastreio?dataInicio=" + data_start + "&dataFim=" + data_end, auth=('aboliveira', 'alison00'))
+        int(id)) + "/rastreio?dataInicio=" + data_start + "&dataFim=" + data_end, auth=('', ''))
     if req.status_code == 200:
         df = pd.DataFrame((map(f, req.json()['features'])))
         df['servico'] = servico
@@ -143,7 +143,7 @@ def get_parada(id, servico, data_start, data_end):
 
     """
     req = requests.get("http://backend.rassystem.com.br/app/v1/api/veiculos/" + str(
-        int(id)) + "/paradas?dataInicio=" + data_start + "&dataFim=" + data_end, auth=('aboliveira', 'alison00'))
+        int(id)) + "/paradas?dataInicio=" + data_start + "&dataFim=" + data_end, auth=('', ''))
     if req.status_code == 200:
         df = pd.DataFrame((map(f, req.json()['features'])))
         df['servico'] = servico
@@ -203,7 +203,7 @@ def get_dataframes(data_start, data_end):
     df : dataframe com os dados de parada ou rastreio do veículo -  dataframe. 
 
     """
-    req = requests.get('http://backend.rassystem.com.br/app/v1/api/filiais', auth=('aboliveira', 'alison00'))
+    req = requests.get('http://backend.rassystem.com.br/app/v1/api/filiais', auth=('', ''))
     global df_filiais
     global df_rotulos
     global df_veiculos
