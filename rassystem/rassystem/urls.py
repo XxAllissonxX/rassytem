@@ -15,9 +15,10 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from core.views import CallFilterView
+from core.views import CallFilterView, CallFilteredListView
 
 urlpatterns = [
     path('call_filter/', CallFilterView.as_view()),
+    path('call_filtered/', CallFilteredListView.as_view()),
     path('admin/', admin.site.urls),
 ]
